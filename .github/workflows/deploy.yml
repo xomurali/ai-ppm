@@ -1,0 +1,82 @@
+name: Build & Deploy to Azure VM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. Install dependencies
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # 4. Build the frontend
+      - name: Build frontend
+        run: npm run build
+
+      # 5. Install server dependencies (for deployment)
+      - name: Install server dependencies
+        run: cd server && npm ci --production
+
+      # 6. Package the deployment
+      - name: Create deployment package
+        run: tar -czf ai-ppm-deploy.tar.gz dist/ server/ deploy/
+
+      # 7. Copy to Azure VM via SSH
+      - name: Copy package to Azure VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "ai-ppm-deploy.tar.gz"
+          target: "/home/${{ secrets.VM_USER }}/"
+
+      # 8. Deploy on the VM
+      - name: Deploy on Azure VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.VM_USER }}
+            tar -xzf ai-ppm-deploy.tar.gz
+
+            # Update frontend
+            sudo cp -r dist/* /var/www/ai-ppm/
+            sudo chown -R www-data:www-data /var/www/ai-ppm
+
+            # Update backend (preserve data directory)
+            sudo cp server/index.js /opt/ai-ppm-server/index.js
+            sudo cp server/package.json /opt/ai-ppm-server/package.json
+            cd /opt/ai-ppm-server && sudo npm install --production
+            sudo chown -R www-data:www-data /opt/ai-ppm-server
+
+            # Restart services
+            sudo systemctl restart ai-ppm-api
+            sudo systemctl reload nginx
+
+            # Verify
+            sleep 2
+            curl -sf http://localhost:3001/api/health || echo "WARNING: API health check failed"
+
+            # Cleanup
+            rm -f /home/${{ secrets.VM_USER }}/ai-ppm-deploy.tar.gz
+
+            echo "Deployment complete: $(date)"
