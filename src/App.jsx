@@ -1605,13 +1605,34 @@ const ProjectDetail = ({ project, onNav, onUpdateProject, onBack }) => {
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={label}>Expected Value</label>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                     {IMPACT_TIERS.map((v, i) => (
                       <div key={i} onClick={() => { update("valNum", v.valNum); update("value", v.valStr); }} style={{ flex: 1, padding: "8px 6px", borderRadius: 6, textAlign: "center", cursor: "pointer", background: p.valNum===v.valNum ? W.successLight : "#fff", border: "1.5px solid "+(p.valNum===v.valNum ? W.success : W.borderLight), transition: "all 0.15s" }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: p.valNum===v.valNum ? W.success : W.text }}>{v.label}</div>
                         <div style={{ fontSize: 9, color: p.valNum===v.valNum ? W.success : W.textMuted, marginTop: 2 }}>{v.sub}</div>
                       </div>
                     ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ ...label, marginBottom: 3, fontSize: 10 }}>Exact value ($)</label>
+                      <input
+                        type="number"
+                        value={p.valNum||""}
+                        onChange={e => {
+                          var n = parseInt(e.target.value) || 0;
+                          var display = n >= 1000000 ? "$"+(n/1000000).toFixed(1)+"M" : n >= 1000 ? "$"+Math.round(n/1000)+"K" : "$"+n;
+                          update("valNum", n);
+                          update("value", display);
+                        }}
+                        placeholder="e.g. 4500000"
+                        style={{ ...is, fontFamily: font }}
+                      />
+                    </div>
+                    <div style={{ paddingTop: 18 }}>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: W.success }}>{p.value || formatVal(p.valNum || 0)}</div>
+                      <div style={{ fontSize: 9, color: W.textMuted }}>computed display value</div>
+                    </div>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 12 }}>
